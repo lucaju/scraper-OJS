@@ -1,13 +1,13 @@
 {
-  "name": "compos-node",
+  "name": "scraper-for-open-journal-system",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "Luciano Frizzera",
-  "license": "ISC",
+  "author": "Luciano Frizzera (lucaju@gmail.com) (luciano.fluxo.art.br)",
+  "license": "MIT License",
   "dependencies": {
     "cheerio": "^1.0.0-rc.2",
     "colors": "^1.3.0",
