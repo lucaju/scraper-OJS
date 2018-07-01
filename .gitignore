@@ -3,6 +3,7 @@
 
 # files
 package-lock.json
+.gitignore
 
 # Logs
 logs
