@@ -387,7 +387,7 @@ function getCSV() {
 		log: true
 	};
 
-	csvdata.write(file, dataset, options);
+	csvdata.write(`${folder}/${file}`, dataset, options);
 
 	console.log(`-----------------`);
 }
