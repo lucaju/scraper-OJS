@@ -13,7 +13,7 @@ const fs = require('fs');
 
 //Initialize variables
 let dataset = [];
-let pageLimit = 1; // default:10 // -1 -> no limit
+let pageLimit = 10; // default:10 // -1 -> no limit
 let externalPageNumber = 0;
 
 let datetime = new Date();
