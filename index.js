@@ -13,16 +13,18 @@ const fs = require('fs');
 
 //Initialize variables
 let dataset = [];
-let pageLimit = 10; // default:10 // -1 -> no limit
-let externalPageNumber = 0;
 
 let datetime = new Date();
 datetime = `${datetime.getDate()}-${(datetime.getMonth()+1)}-${datetime.getFullYear()}`;
+
+let externalPageNumber = 0;
 
 let targetWebsite = {
 	name: "Compos",
 	baseUrl:"http://www.e-compos.org.br/e-compos/"
 };
+let pageLimit = 10; // default:10 // -1 -> no limit
+let loadDetails = true; // default:10 // -1 -> no limit
 
 let rpOptions = {
 	transform: function (body) {
@@ -30,28 +32,32 @@ let rpOptions = {
 	}
 };
 
-//asesse varuable pass throug command line
-process.argv.forEach((val, index) => {
-	//limit
-	if (val.substr(0,6) == "limit=") {
-		setLimit(val);
-	}
-});
-
-//set page limit
-function setLimit(val) {
-	let limit = val.split("=");
-	let l = +limit[1];
-	if(Number.isInteger(l)) {
-		pageLimit = l;
-		console.log(`Page limit set to ${l}.`);
-	} else {
-		console.log("Page limit must be a number. Default: 10 // Unlimited: -1 .");
-	}
-}
 
 //----------------------------
+// passing variables 
 
+//asesse Variables passed throug command line (e.g, node index limit=10)
+// process.argv.forEach((val, index) => {
+// 	//limit
+// 	if (val.substr(0,6) == "limit=") {
+// 		setLimit(val);
+// 	}
+// });
+
+// //set page limit
+// function setLimit(val) {
+// 	let limit = val.split("=");
+// 	let l = +limit[1];
+// 	if(Number.isInteger(l)) {
+// 		pageLimit = l;
+// 		console.log(`Page limit set to ${l}.`);
+// 	} else {
+// 		console.log("Page limit must be a number. Default: 10 // Unlimited: -1 .");
+// 	}
+// }
+
+//----------------------------
+//Initical Setup
 console.log("Webscraper for Open Journal System".green);
 
 setup();
@@ -71,7 +77,7 @@ function setup() {
 		rl.question(`Target website url? ` + `(Default: ${targetWebsite.baseUrl}): `.grey, (url) => {
 			if (url.length > 0) targetWebsite.baseUrl = url;
 		
-			rl.question(`Page limit? ` + ` (Default: ${pageLimit}): `.grey, (limit) => {
+			rl.question(`Page limit? ` + ` (Default: ${pageLimit}. Unlimited: -1): `.grey, (limit) => {
 				if (limit.length > 0) pageLimit = limit;
 				
 				initScrapper();
@@ -127,9 +133,17 @@ function loadURL(type, articleID) {
 				if(error404.length == 0) {
 					parseExternal($);
 				} else {
-					console.log(`No more pages to scrape. Scraping details`);
+					console.log(`Page limit rechead.` + ` (increase pagelimit for more)`.grey);
 					console.log(`--------------`);
-					loadNextDetails();
+
+					//if scraping details ..
+					if (loadDetails == true) {
+						console.log(`Scraping details.`);
+						loadNextDetails();
+					} else {
+						finish();
+					}
+
 				}
 
 			} else {
@@ -167,7 +181,7 @@ function parseExternal($) {
 			const cells = $(line.find('td'));
 
 			//variables to save
-			let id, volume, number, year, title, url, pdf, authors;
+			let articleID, volume, number, year, title, url, pdf, authors;
 			
 			// 1. volume and number is in the first column
 			let cellEdition = $(cells[0]);
@@ -202,7 +216,7 @@ function parseExternal($) {
 			//4. get item ID from URL
 			let idRegex = /\/(\d{1,})/; 
 			let idMatch = url.match(idRegex);
-			id = idMatch[1];
+			articleID = idMatch[1];
 
 			//get author in the next line
 			let authorsLine = $(line.next());
@@ -217,7 +231,8 @@ function parseExternal($) {
 			 
 			 //data
 			 let article = {
-				id: id,
+				journal: targetWebsite.name,
+				articleID: articleID,
 				index: dataset.length,
 				authors: authors,
 				title: title,
@@ -237,11 +252,19 @@ function parseExternal($) {
 	});
 
 	//check page page limit
-	// if reach the limit, stop gathering extrnal pages and start collecting dedtails.
+	// if reach the limit, stop gathering external pages
 	if(pageLimit > 0 && externalPageNumber >= pageLimit) {
-		console.log(`Page limit rechead (increase pagelimit for more). Scraping details`);
+		console.log(`Page limit rechead.` + ` (increase pagelimit for more)`.grey);
 		console.log(`--------------`);
-		loadNextDetails();
+
+		//if scraping details ..
+		if (loadDetails == true) {
+			console.log(`Scraping details.`);
+			loadNextDetails();
+		} else {
+			finish();
+		}
+
 	} else {
 		addPageToScrape();
 	}
@@ -257,8 +280,8 @@ function loadNextDetails(articleIndex) {
 	//contine to call the next if index is lower than the total
 	if (articleIndex < dataset.length) {
 		const article = dataset[articleIndex];
-		rpOptions.uri = `${targetWebsite.baseUrl}article/view/${article.id}`;
-		loadURL("internal",article.id);
+		rpOptions.uri = `${targetWebsite.baseUrl}article/view/${article.articleID}`;
+		loadURL("internal",article.articleID);
 	} else {
 		finish();
 	}
@@ -269,7 +292,7 @@ function loadNextDetails(articleIndex) {
 function parseInternal($,articleID) {
 
 	//call article on the list
-	let article = dataset.find(item => item.id == articleID);
+	let article = dataset.find(item => item.articleID == articleID);
 
 	console.log(`scraping article: ${articleID} (${article.index}/${dataset.length})`);
 
@@ -325,16 +348,20 @@ function parseInternal($,articleID) {
 //finish
 function finish() {
 
-	let articlesComplete = dataset.filter(article => article.complete == true);
+	if (loadDetails == true) {
 
-	console.log(`-----------------`);
-	console.log(`Done! ${articlesComplete.length}/${dataset.length}`);
-	console.log(`-----------------`);
+		let articlesComplete = dataset.filter(article => article.complete == true);
+
+		console.log(`-----------------`);
+		console.log(`Done! ${articlesComplete.length}/${dataset.length}`);
+		console.log(`-----------------`);
+	}
 
 	//remove irrelevant data
 	for (const article of dataset) {
 		delete article.index;
 		delete article.complete;
+		delete article.details;
 	}
 
 	//parse, transform and save in both CSV and JSON
@@ -377,12 +404,13 @@ function getCSV() {
 	const file = `${targetWebsite.name}-${datetime}.csv`;
 
 	//header
-	let header = 'id,authors,title,volume,number,year,url,pdf,keywords,abstract,doi';
-	csvdata.write(`${folder}/${file}`, header);
+	let header = 'journal|articleID|authors|title|volume|number|year|url|pdf|keywords|abstract|doi';
+	// csvdata.write(`${folder}/${file}`, header);
 
 	//body
 	let options = {
-		append: true,
+		// append: false,
+		delimiter: '|',
 		header: header,
 		log: true
 	};
